@@ -5,7 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   build:
@@ -21,15 +21,10 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
     
-    - name: Cache Gradle packages
-      uses: actions/cache@v4
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v2
       with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
+        gradle-version: 7.6
     
     - name: Download Vosk Model
       run: |
@@ -37,13 +32,11 @@ jobs:
         mkdir -p android/app/src/main/assets
         cd android/app/src/main/assets
         
-        # 如果模型已存在，先删除
         if [ -d "vosk-model-small-cn-0.22" ]; then
           echo "🗑️ 删除旧模型..."
           rm -rf vosk-model-small-cn-0.22
         fi
         
-        # 下载模型
         wget -q --show-progress https://alphacephei.com/vosk/models/vosk-model-small-cn-0.22.zip
         
         echo "📦 解压模型..."
@@ -54,11 +47,24 @@ jobs:
         ls -lh vosk-model-small-cn-0.22/
     
     - name: Grant execute permission for gradlew
-      run: chmod +x android/gradlew
+      run: |
+        if [ -f "android/gradlew" ]; then
+          chmod +x android/gradlew
+        else
+          echo "⚠️ gradlew not found, will use gradle wrapper task"
+        fi
+    
+    - name: Generate Gradle Wrapper
+      working-directory: ./android
+      run: |
+        if [ ! -f "gradlew" ]; then
+          echo "📝 生成 Gradle Wrapper..."
+          gradle wrapper --gradle-version 7.6
+        fi
     
     - name: Build Debug APK
-      run: ./gradlew assembleDebug
       working-directory: ./android
+      run: ./gradlew assembleDebug
     
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
@@ -68,8 +74,8 @@ jobs:
         retention-days: 30
     
     - name: Build Release APK
-      run: ./gradlew assembleRelease
       working-directory: ./android
+      run: ./gradlew assembleRelease
     
     - name: Upload Release APK
       uses: actions/upload-artifact@v4
