@@ -55,7 +55,7 @@ def execute_openclaw(command: str) -> tuple[bool, str]:
         
         # 调用OpenClaw agent
         result = subprocess.run(
-            ["openclaw", "agent", "-m", command],
+            ["openclaw", "agent", "--agent", "main", "-m", command],
             capture_output=True,
             text=True,
             timeout=120,  # 2分钟超时

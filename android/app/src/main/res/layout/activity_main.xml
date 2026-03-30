@@ -4,20 +4,77 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:background="@color/black">
+    android:padding="16dp"
+    android:background="#1a1a2e">
 
-    <!-- 标题 -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="语音助手"
-        android:textSize="28sp"
-        android:textColor="@color/white"
+        android:text="虾宝语音助手"
+        android:textSize="24sp"
+        android:textColor="#ffffff"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="32dp"/>
+        android:layout_marginBottom="16dp"/>
+
+    <!-- 状态显示 -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="未连接"
+        android:textSize="16sp"
+        android:textColor="#888888"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- 唤醒词设置 -->
+    <TextView
+        android:id="@+id/tvWakeWord"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="当前唤醒词: 虾宝"
+        android:textSize="14sp"
+        android:textColor="#4CAF50"
+        android:layout_marginBottom="8dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp">
+
+        <EditText
+            android:id="@+id/etWakeWord"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:hint="设置唤醒词"
+            android:text="虾宝"
+            android:textColor="#ffffff"
+            android:textColorHint="#888888"
+            android:background="#16213e"
+            android:padding="12dp"/>
+
+        <Button
+            android:id="@+id/btnSaveWakeWord"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="保存"
+            android:background="#0f3460"
+            android:textColor="#ffffff"/>
+    </LinearLayout>
 
     <!-- 服务器设置 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="服务器设置"
+        android:textSize="16sp"
+        android:textColor="#ffffff"
+        android:layout_marginBottom="8dp"/>
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -28,16 +85,14 @@
             android:id="@+id/etServerIp"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="2"
-            android:hint="@string/hint_server_ip"
-            android:text="192.168.1.100"
+            android:layout_weight="3"
+            android:hint="服务器IP"
+            android:text="192.168.1.12"
             android:inputType="text"
-            android:textColor="@color/white"
-            android:textColorHint="#80FFFFFF"
-            android:backgroundTint="@color/purple_500"
-            android:padding="12dp">
-            <requestFocus />
-        </EditText>
+            android:textColor="#ffffff"
+            android:textColorHint="#888888"
+            android:background="#16213e"
+            android:padding="12dp"/>
 
         <EditText
             android:id="@+id/etServerPort"
@@ -45,119 +100,59 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
-            android:hint="@string/hint_port"
+            android:hint="端口"
             android:text="8765"
             android:inputType="number"
-            android:textColor="@color/white"
-            android:textColorHint="#80FFFFFF"
-            android:backgroundTint="@color/purple_500"
+            android:textColor="#ffffff"
+            android:textColorHint="#888888"
+            android:background="#16213e"
             android:padding="12dp"/>
     </LinearLayout>
 
-    <!-- 状态指示 -->
+    <!-- 控制按钮 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="24dp">
-
-        <View
-            android:id="@+id/statusIndicator"
-            android:layout_width="16dp"
-            android:layout_height="16dp"
-            android:background="@drawable/status_disconnected"
-            android:layout_marginEnd="12dp"/>
-
-        <TextView
-            android:id="@+id/tvStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/text_status_disconnected"
-            android:textSize="16sp"
-            android:textColor="@color/white"/>
-    </LinearLayout>
-
-    <!-- 控制按钮 -->
-    <Button
-        android:id="@+id/btnConnect"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/text_connect"
-        android:backgroundTint="@color/purple_500"
-        android:textColor="@color/white"
-        android:padding="16dp"
-        android:textSize="16sp"
-        android:layout_marginBottom="12dp"/>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:layout_marginBottom="16dp">
 
         <Button
-            android:id="@+id/btnSettings"
+            android:id="@+id/btnConnect"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/text_settings"
-            android:backgroundTint="@color/teal_700"
-            android:textColor="@color/white"
-            android:layout_marginEnd="8dp"/>
+            android:text="启动服务"
+            android:background="#4CAF50"
+            android:textColor="#ffffff"
+            android:padding="16dp"/>
 
         <Button
             android:id="@+id/btnTest"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/text_test"
-            android:backgroundTint="@color/teal_700"
-            android:textColor="@color/white"
-            android:layout_marginStart="8dp"/>
+            android:layout_marginStart="8dp"
+            android:text="测试连接"
+            android:background="#2196F3"
+            android:textColor="#ffffff"
+            android:padding="16dp"/>
     </LinearLayout>
 
-    <!-- 识别结果展示区 -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#30FFFFFF"
-        android:layout_marginVertical="24dp"/>
-
+    <!-- 使用说明 -->
     <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="识别内容"
-        android:textSize="14sp"
-        android:textColor="#80FFFFFF"
-        android:layout_marginBottom="8dp"/>
-
-    <TextView
-        android:id="@+id/tvRecognized"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/text_waiting_input"
-        android:textSize="18sp"
-        android:textColor="@color/teal_200"
-        android:minHeight="48dp"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="16dp"/>
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="执行结果"
-        android:textSize="14sp"
-        android:textColor="#80FFFFFF"
-        android:layout_marginBottom="8dp"/>
-
-    <TextView
-        android:id="@+id/tvResponse"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/text_waiting_result"
-        android:textSize="16sp"
-        android:textColor="@color/white"
-        android:minHeight="48dp"
-        android:gravity="center_vertical"/>
+        android:text="使用说明：
+1. 设置唤醒词（默认：虾宝）
+2. 输入Mac服务器IP
+3. 点击启动服务
+4. 说出唤醒词激活
+5. 说出指令如：查天气
+6. 等待语音回复"
+        android:textSize="12sp"
+        android:textColor="#aaaaaa"
+        android:lineSpacingMultiplier="1.3"
+        android:padding="12dp"
+        android:background="#16213e"/>
 
 </LinearLayout>
