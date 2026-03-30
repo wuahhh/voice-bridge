@@ -73,7 +73,7 @@ def execute_openclaw(command: str) -> tuple[bool, str]:
         # 调用OpenClaw CLI
         # 注意：这里假设openclaw已经在PATH中
         result = subprocess.run(
-            ["echo", "收到指令:", clean_command],
+            ["openclaw", "agent", "-m", clean_command],
             capture_output=True,
             text=True,
             timeout=60,  # 60秒超时
