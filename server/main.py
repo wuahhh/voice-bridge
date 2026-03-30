@@ -73,7 +73,7 @@ def execute_openclaw(command: str) -> tuple[bool, str]:
         # 调用OpenClaw CLI
         # 注意：这里假设openclaw已经在PATH中
         result = subprocess.run(
-            ["openclaw", "run", clean_command],
+            ["echo", "收到指令:", clean_command],
             capture_output=True,
             text=True,
             timeout=60,  # 60秒超时
@@ -105,7 +105,7 @@ def preprocess_command(command: str) -> str:
     预处理语音命令，移除唤醒词和填充词
     """
     # 唤醒词列表
-    wake_words = ["小助手", "hey assistant", "你好", "嘿"]
+    wake_words = ["小助手", "hey assistant", "嘿"]
     
     lower_cmd = command.lower().strip()
     
