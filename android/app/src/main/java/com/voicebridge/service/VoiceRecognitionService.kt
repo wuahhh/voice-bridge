@@ -238,6 +238,8 @@ class VoiceRecognitionService : Service() {
                             val partial = json.optString("partial", "")
                             if (partial.isNotEmpty()) {
                                 _recognizedText.value = partial
+                            } else {
+                                // partial is empty, do nothing
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "解析partial结果失败", e)
@@ -253,6 +255,8 @@ class VoiceRecognitionService : Service() {
                             if (text.isNotEmpty()) {
                                 _recognizedText.value = text
                                 processVoiceCommand(text)
+                            } else {
+                                // text is empty, do nothing
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "解析结果失败", e)
