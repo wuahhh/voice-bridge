@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # FastAPI应用
-app = FastAPI(title="Voice Bridge Server", version="1.0.0")
+app = FastAPI(title="Voice Bridge Server", version="2.0.0")
 
 # 存储活跃的WebSocket连接
 active_connections: Set[WebSocket] = set()
@@ -46,77 +46,42 @@ class CommandRequest(BaseModel):
     request_id: Optional[str] = None
 
 
-class CommandResponse(BaseModel):
-    """命令响应模型"""
-    success: bool
-    result: str
-    audio_url: Optional[str] = None
-    timestamp: str
-    request_id: Optional[str] = None
-
-
-def execute_command(command: str) -> tuple[bool, str]:
+def execute_openclaw(command: str) -> tuple[bool, str]:
     """
-    执行命令 - 简化版，直接返回收到的指令
+    执行OpenClaw agent命令
     """
     try:
-        clean_command = command.strip()
-        logger.info(f"收到指令: {clean_command}")
+        logger.info(f"执行OpenClaw: {command}")
         
-        # 这里可以接入OpenClaw或其他逻辑
-        # 现在直接返回成功，方便调试
-        result = f"收到指令: {clean_command}"
+        # 调用OpenClaw agent
+        result = subprocess.run(
+            ["openclaw", "agent", "-m", command],
+            capture_output=True,
+            text=True,
+            timeout=120,  # 2分钟超时
+            encoding='utf-8'
+        )
         
-        return True, result
+        if result.returncode == 0:
+            output = result.stdout.strip()
+            # 简化输出，取前200字符作为摘要
+            summary = output[:300] if len(output) > 300 else output
+            logger.info(f"执行成功: {summary[:100]}...")
+            return True, summary
+        else:
+            error = result.stderr.strip() or "执行失败"
+            logger.error(f"执行失败: {error}")
+            return False, error
             
+    except subprocess.TimeoutExpired:
+        logger.error("执行超时")
+        return False, "任务执行超时，请重试"
+    except FileNotFoundError:
+        logger.error("OpenClaw未找到")
+        return False, "OpenClaw未安装"
     except Exception as e:
         logger.error(f"执行异常: {str(e)}")
         return False, f"执行异常: {str(e)}"
-
-
-def preprocess_command(command: str) -> str:
-    """
-    预处理语音命令，移除唤醒词和填充词
-    """
-    wake_words = ["小助手", "hey assistant", "嘿"]
-    
-    lower_cmd = command.lower().strip()
-    
-    for wake in wake_words:
-        lower_cmd = lower_cmd.replace(wake.lower(), "")
-    
-    clean = lower_cmd.strip()
-    return clean if clean else command
-
-
-def text_to_speech(text: str) -> Optional[bytes]:
-    """
-    使用macOS say命令将文本转为语音
-    """
-    try:
-        import tempfile
-        import os
-        
-        with tempfile.NamedTemporaryFile(suffix=".aiff", delete=False) as f:
-            temp_path = f.name
-        
-        voice = "Ting-Ting" if any('\u4e00' <= c <= '\u9fff' for c in text) else "Samantha"
-        
-        subprocess.run(
-            ["say", "-v", voice, "-o", temp_path, text[:200]],
-            check=True,
-            timeout=30
-        )
-        
-        with open(temp_path, "rb") as f:
-            audio_data = f.read()
-        
-        os.unlink(temp_path)
-        return audio_data
-        
-    except Exception as e:
-        logger.error(f"TTS失败: {str(e)}")
-        return None
 
 
 @app.on_event("startup")
@@ -124,15 +89,9 @@ async def startup_event():
     """服务启动事件"""
     server_status["started_at"] = datetime.now().isoformat()
     logger.info("=" * 50)
-    logger.info("Voice Bridge Server 已启动")
-    logger.info("等待Android设备连接...")
+    logger.info("Voice Bridge Server v2.0 已启动")
+    logger.info("支持完整OpenClaw集成")
     logger.info("=" * 50)
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """服务关闭事件"""
-    logger.info("Voice Bridge Server 正在关闭...")
 
 
 @app.get("/health")
@@ -141,18 +100,8 @@ async def health_check():
     return JSONResponse({
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "uptime": server_status["started_at"],
         "connected_clients": len(active_connections),
         "total_commands": server_status["total_commands"]
-    })
-
-
-@app.get("/status")
-async def get_status():
-    """获取服务状态"""
-    return JSONResponse({
-        **server_status,
-        "connected_clients": len(active_connections)
     })
 
 
@@ -165,7 +114,7 @@ async def websocket_endpoint(websocket: WebSocket):
     active_connections.add(websocket)
     client_id = id(websocket)
     
-    logger.info(f"客户端 {client_id} 已连接 | 当前连接数: {len(active_connections)}")
+    logger.info(f"客户端 {client_id} 已连接")
     
     try:
         while True:
@@ -175,21 +124,22 @@ async def websocket_endpoint(websocket: WebSocket):
                 data = json.loads(message)
                 command = data.get("command", "").strip()
                 request_id = data.get("request_id")
+                need_tts = data.get("tts", True)
                 
                 if not command:
-                    await send_error_response(websocket, "空命令", request_id)
+                    await websocket.send_json({
+                        "type": "error",
+                        "success": False,
+                        "error": "空命令",
+                        "request_id": request_id
+                    })
                     continue
                 
-                logger.info(f"收到指令 [{client_id}]: {command}")
-                server_status["last_command"] = {
-                    "command": command,
-                    "timestamp": datetime.now().isoformat(),
-                    "client_id": client_id
-                }
-                
-                # 执行命令
-                success, result = execute_command(command)
+                logger.info(f"[{client_id}] 指令: {command}")
                 server_status["total_commands"] += 1
+                
+                # 执行OpenClaw
+                success, result = execute_openclaw(command)
                 
                 if success:
                     server_status["successful_commands"] += 1
@@ -206,86 +156,45 @@ async def websocket_endpoint(websocket: WebSocket):
                 }
                 
                 await websocket.send_json(response)
-                logger.info(f"响应已发送 [{client_id}]: {result}")
+                logger.info(f"[{client_id}] 响应已发送")
                 
             except json.JSONDecodeError:
-                await send_error_response(websocket, "无效的JSON格式", None)
+                await websocket.send_json({
+                    "type": "error",
+                    "success": False,
+                    "error": "无效的JSON格式"
+                })
             except Exception as e:
-                logger.error(f"处理消息时出错: {str(e)}")
-                await send_error_response(websocket, f"服务器错误: {str(e)}", None)
+                logger.error(f"处理错误: {str(e)}")
+                await websocket.send_json({
+                    "type": "error",
+                    "success": False,
+                    "error": f"服务器错误: {str(e)}"
+                })
                 
     except WebSocketDisconnect:
-        logger.info(f"客户端 {client_id} 断开连接")
-    except Exception as e:
-        logger.error(f"WebSocket错误 [{client_id}]: {str(e)}")
+        logger.info(f"客户端 {client_id} 断开")
     finally:
         active_connections.discard(websocket)
-        logger.info(f"客户端 {client_id} 已清理 | 当前连接数: {len(active_connections)}")
-
-
-async def send_error_response(websocket, error_msg: str, request_id: Optional[str]):
-    """发送错误响应"""
-    await websocket.send_json({
-        "type": "error",
-        "success": False,
-        "error": error_msg,
-        "timestamp": datetime.now().isoformat(),
-        "request_id": request_id
-    })
-
-
-@app.post("/api/command")
-async def http_command(request: CommandRequest):
-    """
-    HTTP API端点 - 用于测试
-    """
-    success, result = execute_command(request.command)
-    
-    return CommandResponse(
-        success=success,
-        result=result,
-        timestamp=datetime.now().isoformat(),
-        request_id=request.request_id
-    )
-
-
-def get_local_ip() -> str:
-    """获取本地IP地址"""
-    import socket
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return "127.0.0.1"
 
 
 if __name__ == "__main__":
-    import argparse
+    import socket
     
-    parser = argparse.ArgumentParser(description="Voice Bridge Server")
-    parser.add_argument("--host", default="0.0.0.0", help="绑定地址")
-    parser.add_argument("--port", type=int, default=8765, help="端口")
-    parser.add_argument("--log-level", default="info", help="日志级别")
-    
-    args = parser.parse_args()
-    
-    local_ip = get_local_ip()
+    # 获取本机IP
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except:
+        local_ip = "127.0.0.1"
     
     print("\n" + "=" * 60)
-    print("🎙️  Voice Bridge Server")
+    print("🎙️  Voice Bridge Server v2.0")
     print("=" * 60)
-    print(f"📡  服务地址: http://{local_ip}:{args.port}")
-    print(f"🔗  WebSocket: ws://{local_ip}:{args.port}/ws")
-    print(f"💓  健康检查: http://{local_ip}:{args.port}/health")
+    print(f"📡  服务地址: http://{local_ip}:8765")
+    print(f"🔗  WebSocket: ws://{local_ip}:8765/ws")
     print("=" * 60 + "\n")
     
-    uvicorn.run(
-        "main:app",
-        host=args.host,
-        port=args.port,
-        log_level=args.log_level,
-        reload=False
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8765, log_level="info")
