@@ -37,11 +37,17 @@ jobs:
         mkdir -p android/app/src/main/assets
         cd android/app/src/main/assets
         
+        # 如果模型已存在，先删除
+        if [ -d "vosk-model-small-cn-0.22" ]; then
+          echo "🗑️ 删除旧模型..."
+          rm -rf vosk-model-small-cn-0.22
+        fi
+        
         # 下载模型
         wget -q --show-progress https://alphacephei.com/vosk/models/vosk-model-small-cn-0.22.zip
         
         echo "📦 解压模型..."
-        unzip -q vosk-model-small-cn-0.22.zip
+        unzip -o -q vosk-model-small-cn-0.22.zip
         rm vosk-model-small-cn-0.22.zip
         
         echo "✅ 模型准备完成"
