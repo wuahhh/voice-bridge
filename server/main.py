@@ -55,46 +55,20 @@ class CommandResponse(BaseModel):
     request_id: Optional[str] = None
 
 
-def execute_openclaw(command: str) -> tuple[bool, str]:
+def execute_command(command: str) -> tuple[bool, str]:
     """
-    执行OpenClaw CLI命令
-    
-    Args:
-        command: 用户语音指令
-        
-    Returns:
-        (success, result_text)
+    执行命令 - 简化版，直接返回收到的指令
     """
     try:
-        # 预处理命令 - 移除唤醒词和无关词汇
-        clean_command = preprocess_command(command)
-        logger.info(f"执行命令: {clean_command}")
+        clean_command = command.strip()
+        logger.info(f"收到指令: {clean_command}")
         
-        # 调用OpenClaw CLI
-        # 注意：这里假设openclaw已经在PATH中
-        result = subprocess.run(
-            ["openclaw", "agent", "-m", clean_command],
-            capture_output=True,
-            text=True,
-            timeout=60,  # 60秒超时
-            encoding='utf-8'
-        )
+        # 这里可以接入OpenClaw或其他逻辑
+        # 现在直接返回成功，方便调试
+        result = f"收到指令: {clean_command}"
         
-        if result.returncode == 0:
-            output = result.stdout.strip()
-            logger.info(f"命令执行成功: {output[:100]}...")
-            return True, output
-        else:
-            error = result.stderr.strip() or "未知错误"
-            logger.error(f"命令执行失败: {error}")
-            return False, f"执行失败: {error}"
+        return True, result
             
-    except subprocess.TimeoutExpired:
-        logger.error("命令执行超时")
-        return False, "命令执行超时，请重试"
-    except FileNotFoundError:
-        logger.error("OpenClaw CLI未找到")
-        return False, "OpenClaw未安装或未添加到PATH"
     except Exception as e:
         logger.error(f"执行异常: {str(e)}")
         return False, f"执行异常: {str(e)}"
@@ -104,58 +78,40 @@ def preprocess_command(command: str) -> str:
     """
     预处理语音命令，移除唤醒词和填充词
     """
-    # 唤醒词列表
     wake_words = ["小助手", "hey assistant", "嘿"]
     
     lower_cmd = command.lower().strip()
     
-    # 移除唤醒词
     for wake in wake_words:
         lower_cmd = lower_cmd.replace(wake.lower(), "")
     
-    # 清理多余空格
     clean = lower_cmd.strip()
-    
-    # 如果命令为空，返回原始命令
     return clean if clean else command
 
 
 def text_to_speech(text: str) -> Optional[bytes]:
     """
     使用macOS say命令将文本转为语音
-    
-    Args:
-        text: 要转换的文本
-        
-    Returns:
-        音频数据或None
     """
     try:
         import tempfile
         import os
         
-        # 创建临时文件
         with tempfile.NamedTemporaryFile(suffix=".aiff", delete=False) as f:
             temp_path = f.name
         
-        # 使用say命令生成音频
-        # -v 选择声音 (可选: Ting-Ting 中文女声, Samantha 英文女声)
-        # -o 输出文件
         voice = "Ting-Ting" if any('\u4e00' <= c <= '\u9fff' for c in text) else "Samantha"
         
         subprocess.run(
-            ["say", "-v", voice, "-o", temp_path, text[:200]],  # 限制200字符
+            ["say", "-v", voice, "-o", temp_path, text[:200]],
             check=True,
             timeout=30
         )
         
-        # 读取音频文件
         with open(temp_path, "rb") as f:
             audio_data = f.read()
         
-        # 清理临时文件
         os.unlink(temp_path)
-        
         return audio_data
         
     except Exception as e:
@@ -177,9 +133,6 @@ async def startup_event():
 async def shutdown_event():
     """服务关闭事件"""
     logger.info("Voice Bridge Server 正在关闭...")
-    # 关闭所有WebSocket连接
-    for ws in list(active_connections):
-        await ws.close()
 
 
 @app.get("/health")
@@ -216,7 +169,6 @@ async def websocket_endpoint(websocket: WebSocket):
     
     try:
         while True:
-            # 接收消息
             message = await websocket.receive_text()
             
             try:
@@ -236,20 +188,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 }
                 
                 # 执行命令
-                success, result = execute_openclaw(command)
+                success, result = execute_command(command)
                 server_status["total_commands"] += 1
                 
                 if success:
                     server_status["successful_commands"] += 1
                 else:
                     server_status["failed_commands"] += 1
-                
-                # 生成TTS音频（可选）
-                audio_data = None
-                if data.get("tts", True):
-                    # 简化结果用于TTS
-                    tts_text = result[:150] if success else "执行失败，请重试"
-                    audio_data = text_to_speech(tts_text)
                 
                 # 构建响应
                 response = {
@@ -260,14 +205,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     "request_id": request_id
                 }
                 
-                # 如果有音频数据，发送base64编码
-                if audio_data:
-                    import base64
-                    response["audio"] = base64.b64encode(audio_data).decode("utf-8")
-                    response["audio_format"] = "aiff"
-                
                 await websocket.send_json(response)
-                logger.info(f"响应已发送 [{client_id}]")
+                logger.info(f"响应已发送 [{client_id}]: {result}")
                 
             except json.JSONDecodeError:
                 await send_error_response(websocket, "无效的JSON格式", None)
@@ -284,7 +223,7 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.info(f"客户端 {client_id} 已清理 | 当前连接数: {len(active_connections)}")
 
 
-async def send_error_response(websocket: WebSocket, error_msg: str, request_id: Optional[str]):
+async def send_error_response(websocket, error_msg: str, request_id: Optional[str]):
     """发送错误响应"""
     await websocket.send_json({
         "type": "error",
@@ -300,7 +239,7 @@ async def http_command(request: CommandRequest):
     """
     HTTP API端点 - 用于测试
     """
-    success, result = execute_openclaw(request.command)
+    success, result = execute_command(request.command)
     
     return CommandResponse(
         success=success,
@@ -314,7 +253,6 @@ def get_local_ip() -> str:
     """获取本地IP地址"""
     import socket
     try:
-        # 连接到一个外部地址来获取本地IP
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
@@ -328,8 +266,8 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Voice Bridge Server")
-    parser.add_argument("--host", default="0.0.0.0", help="绑定地址 (默认: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=8765, help="端口 (默认: 8765)")
+    parser.add_argument("--host", default="0.0.0.0", help="绑定地址")
+    parser.add_argument("--port", type=int, default=8765, help="端口")
     parser.add_argument("--log-level", default="info", help="日志级别")
     
     args = parser.parse_args()
